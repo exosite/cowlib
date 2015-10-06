@@ -42,6 +42,8 @@ parse_qs_name(<< $%, H, L, Rest/bits >>, Acc, Name) when
 ->
 	C = (unhex(H) bsl 4 bor unhex(L)),
 	parse_qs_name(Rest, Acc, << Name/bits, C >>);
+parse_qs_name(<< $;, Rest/bits >>, Acc, Name) ->
+	parse_qs_name(Rest, Acc, << Name/bits >>);
 parse_qs_name(<< $+, Rest/bits >>, Acc, Name) ->
 	parse_qs_name(Rest, Acc, << Name/bits, " " >>);
 parse_qs_name(<< $=, Rest/bits >>, Acc, Name) when Name =/= <<>> ->
@@ -64,6 +66,8 @@ parse_qs_value(<< $%, H, L, Rest/bits >>, Acc, Name, Value) when
 ->
 	C = (unhex(H) bsl 4 bor unhex(L)),
 	parse_qs_value(Rest, Acc, Name, << Value/bits, C >>);
+parse_qs_value(<< $;, Rest/bits >>, Acc, Name, Value) ->
+	parse_qs_value(Rest, Acc, Name, << Value/bits >>);
 parse_qs_value(<< $+, Rest/bits >>, Acc, Name, Value) ->
 	parse_qs_value(Rest, Acc, Name, << Value/bits, " " >>);
 parse_qs_value(<< $&, Rest/bits >>, Acc, Name, Value) ->
