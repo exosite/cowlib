@@ -19,6 +19,12 @@
 -export([urldecode/1]).
 -export([urlencode/1]).
 
+-define(IS_HEX(C), (
+  (C >= $0 andalso C =< $9) orelse
+  (C >= $a andalso C =< $f) orelse
+  (C >= $A andalso C =< $F)
+)).
+
 -type qs_vals() :: [{binary(), binary() | true}].
 
 %% @doc Parse an application/x-www-form-urlencoded string.
@@ -31,9 +37,13 @@
 parse_qs(B) ->
 	parse_qs_name(B, [], <<>>).
 
-parse_qs_name(<< $%, H, L, Rest/bits >>, Acc, Name) ->
+parse_qs_name(<< $%, H, L, Rest/bits >>, Acc, Name) when
+  ?IS_HEX(H), ?IS_HEX(L)
+->
 	C = (unhex(H) bsl 4 bor unhex(L)),
 	parse_qs_name(Rest, Acc, << Name/bits, C >>);
+parse_qs_name(<< $;, Rest/bits >>, Acc, Name) ->
+	parse_qs_name(Rest, Acc, << Name/bits >>);
 parse_qs_name(<< $+, Rest/bits >>, Acc, Name) ->
 	parse_qs_name(Rest, Acc, << Name/bits, " " >>);
 parse_qs_name(<< $=, Rest/bits >>, Acc, Name) when Name =/= <<>> ->
@@ -43,7 +53,7 @@ parse_qs_name(<< $&, Rest/bits >>, Acc, Name) ->
 		<<>> -> parse_qs_name(Rest, Acc, <<>>);
 		_ -> parse_qs_name(Rest, [{Name, true}|Acc], <<>>)
 	end;
-parse_qs_name(<< C, Rest/bits >>, Acc, Name) when C =/= $%, C =/= $= ->
+parse_qs_name(<< C, Rest/bits >>, Acc, Name) when C =/= $= ->
 	parse_qs_name(Rest, Acc, << Name/bits, C >>);
 parse_qs_name(<<>>, Acc, Name) ->
 	case Name of
@@ -51,14 +61,18 @@ parse_qs_name(<<>>, Acc, Name) ->
 		_ -> lists:reverse([{Name, true}|Acc])
 	end.
 
-parse_qs_value(<< $%, H, L, Rest/bits >>, Acc, Name, Value) ->
+parse_qs_value(<< $%, H, L, Rest/bits >>, Acc, Name, Value) when
+  ?IS_HEX(H), ?IS_HEX(L)
+->
 	C = (unhex(H) bsl 4 bor unhex(L)),
 	parse_qs_value(Rest, Acc, Name, << Value/bits, C >>);
+parse_qs_value(<< $;, Rest/bits >>, Acc, Name, Value) ->
+	parse_qs_value(Rest, Acc, Name, << Value/bits >>);
 parse_qs_value(<< $+, Rest/bits >>, Acc, Name, Value) ->
 	parse_qs_value(Rest, Acc, Name, << Value/bits, " " >>);
 parse_qs_value(<< $&, Rest/bits >>, Acc, Name, Value) ->
 	parse_qs_name(Rest, [{Name, Value}|Acc], <<>>);
-parse_qs_value(<< C, Rest/bits >>, Acc, Name, Value) when C =/= $% ->
+parse_qs_value(<< C, Rest/bits >>, Acc, Name, Value) ->
 	parse_qs_value(Rest, Acc, Name, << Value/bits, C >>);
 parse_qs_value(<<>>, Acc, Name, Value) ->
 	lists:reverse([{Name, Value}|Acc]).
@@ -332,7 +346,7 @@ horse_qs_longer() ->
 urldecode(B) ->
 	urldecode(B, <<>>).
 
-urldecode(<< $%, H, L, Rest/bits >>, Acc) ->
+urldecode(<< $%, H, L, Rest/bits >>, Acc) when ?IS_HEX(H), ?IS_HEX(L) ->
 	C = (unhex(H) bsl 4 bor unhex(L)),
 	urldecode(Rest, << Acc/bits, C >>);
 urldecode(<< $+, Rest/bits >>, Acc) ->
